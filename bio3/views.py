@@ -416,25 +416,22 @@ class ProjectNetworkList(APIView):
 class NodesNetworkList(APIView):
     def get(self, request, format=None):
         nodes = dict()
-        search = request.GET.get('search', None)
-
+        search = request.GET.get('search', '')
+        start_date = request.GET.get('start_date', '1900-01-01')
+        end_date = request.GET.get('end_date', '2999-01-01')
         if(search):
-            search = '%' + search + '%'
-            with connection.cursor() as cursor:
-                cursor.execute("select uni.id, min(uni.name) as name, min(uni.long) as long, min(uni.lat) as lat, 10+exp(sum(uni.points)*0.001) as points from (select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*1 as points from bio3_project project inner join bio3_university uni on project.main_university_id = uni.id where project.is_active = true and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s) group by uni.id union all select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*0.5 as points from bio3_project project inner join bio3_project_universities pu on project.id = pu.project_id inner join bio3_university uni on pu.university_id = uni.id where project.is_active = true and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s) group by university_id) as uni group by uni.id;", [search, search, search, search])
-                nodes['universities'] = dictfetchall(cursor)
+            search = search.strip()
+        search = '%' + search + '%'
+
         
-            with connection.cursor() as cursor2:
-                cursor2.execute("select pc.community_id as id, min(community.name) as name, min(ST_X(community.location)) as long, min(ST_Y(community.location)) as lat, 10+exp((count(pc.community_id) * 0.5)*0.001) as points from bio3_project_communities pc inner join bio3_project project on pc.project_id = project.id inner join bio3_community community on pc.community_id = community.id where project.is_active = true and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s) group by pc.community_id;", [search, search])
-                nodes['communities'] = dictfetchall(cursor2)
-        else:
-            with connection.cursor() as cursor:
-                cursor.execute("select uni.id, min(uni.name) as name, min(uni.long) as long, min(uni.lat) as lat, 10+exp(sum(uni.points)*0.001) as points from (select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*1 as points from bio3_project project inner join bio3_university uni on project.main_university_id = uni.id where project.is_active = true group by uni.id union all select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*0.5 as points from bio3_project project inner join bio3_project_universities pu on project.id = pu.project_id inner join bio3_university uni on pu.university_id = uni.id where project.is_active = true group by university_id) as uni group by uni.id;")
-                nodes['universities'] = dictfetchall(cursor)
+        with connection.cursor() as cursor:
+            cursor.execute("select uni.id, min(uni.name) as name, min(uni.long) as long, min(uni.lat) as lat, 10+exp(sum(uni.points)*0.001) as points from (select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*1 as points from bio3_project project inner join bio3_university uni on project.main_university_id = uni.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) group by uni.id union all select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*0.5 as points from bio3_project project inner join bio3_project_universities pu on project.id = pu.project_id inner join bio3_university uni on pu.university_id = uni.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) group by university_id) as uni group by uni.id;", [search, search, search, start_date, end_date, search, search, search, start_date, end_date])
+            nodes['universities'] = dictfetchall(cursor)
+    
+        with connection.cursor() as cursor2:
+            cursor2.execute("select pc.community_id as id, min(community.name) as name, min(ST_X(community.location)) as long, min(ST_Y(community.location)) as lat, 10+exp((count(pc.community_id) * 0.5)*0.001) as points from bio3_project_communities pc inner join bio3_project project on pc.project_id = project.id inner join bio3_community community on pc.community_id = community.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) group by pc.community_id;", [search, search, search, start_date, end_date])
+            nodes['communities'] = dictfetchall(cursor2)
         
-            with connection.cursor() as cursor2:
-                cursor2.execute("select pc.community_id as id, min(community.name) as name, min(ST_X(community.location)) as long, min(ST_Y(community.location)) as lat, 10+exp((count(pc.community_id) * 0.5)*0.001) as points from bio3_project_communities pc inner join bio3_project project on pc.project_id = project.id inner join bio3_community community on pc.community_id = community.id where project.is_active = true group by pc.community_id;")
-                nodes['communities'] = dictfetchall(cursor2)
         return JsonResponse(nodes, safe=False)
 
 class NodesNetworkDetail(APIView):
@@ -534,39 +531,43 @@ class ProjectExpandedDetail(APIView):
 class ProjectNetworkExpandedList(APIView):
     
     def get(self, request, format=None):
-        search = request.GET.get('search', None)
-
+        search = request.GET.get('search', '')
+        start_date = request.GET.get('start_date', '1900-01-01')
+        end_date = request.GET.get('end_date', '2999-12-31')
         if(search):
-            search = '%' + search + '%'
-            with connection.cursor() as cursor:
-                cursor.execute("select distinct uni.id, uni.name, ST_X(uni.location) as long, ST_Y(uni.location) as lat, uni.created_at, usuario.id as id_user, usuario.name as user_name, usuario.last_name as user_last_name from bio3_university uni inner join bio3_project project on uni.id = project.main_university_id inner join bio3_customuser usuario on uni.created_by_id = usuario.id where project.is_active = true and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s);", [search, search])
-                universities = dictfetchall(cursor)
+            search = search.strip()
+        search = '%' + search + '%'
+        with connection.cursor() as cursor:
+            cursor.execute("select distinct uni.id, uni.name, ST_X(uni.location) as long, ST_Y(uni.location) as lat, uni.created_at, usuario.id as id_user, usuario.name as user_name, usuario.last_name as user_last_name from bio3_university uni inner join bio3_project project on uni.id = project.main_university_id inner join bio3_customuser usuario on uni.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp);", [search, search, search, start_date, end_date])
+            universities = dictfetchall(cursor)
 
-                for i in range(0, len(universities)):
-                    cursor.execute("select distinct projects.* from (select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s) union all select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s and (unaccent(project.name) ilike %s or unaccent(project.description) ilike %s)) projects;", [universities[i]['id'], search, search, universities[i]['id'], search, search])
-                    universities[i]['projects'] = dictfetchall(cursor)
+            print(str(universities))
+            for i in range(0, len(universities)):
+                cursor.execute("select distinct projects.* from (select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s and ( trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) union all select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) ) projects;", [universities[i]['id'], search, search, search, start_date, end_date, universities[i]['id'], search, search, search, start_date, end_date])
+                universities[i]['projects'] = dictfetchall(cursor)
+                print(len(universities[i]['projects']))
 
-                    for j in range(0, len(universities[i]['projects'])):
-                        cursor.execute("select assoc.*, ROW_NUMBER() OVER(order by project_id asc, type desc, assoc_created_at asc) as rn from (select pu.project_id, uni.id as assoc_id, uni.name as assoc_name, ST_X(uni.location) as assoc_long, ST_Y(uni.location) as assoc_lat, uni.created_at as assoc_created_at, 'U' as type from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id where project.main_university_id = %s union all select pc.project_id, com.id as assoc_id, com.name as assoc_name, ST_X(com.location) as assoc_long, ST_Y(com.location) as assoc_lat, com.created_at as assoc_created_at, 'C' as type from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id where project.main_university_id = %s) assoc where assoc.project_id = %s;", [universities[i]['id'], universities[i]['id'], universities[i]['projects'][j]['id']])
-                        universities[i]['projects'][j]['aristas'] = dictfetchall(cursor)
+                for j in range(0, len(universities[i]['projects'])):
+                    cursor.execute("select assoc.*, ROW_NUMBER() OVER(order by project_id asc, type desc, assoc_created_at asc) as rn from (select pu.project_id, uni.id as assoc_id, uni.name as assoc_name, ST_X(uni.location) as assoc_long, ST_Y(uni.location) as assoc_lat, uni.created_at as assoc_created_at, 'U' as type from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id where project.main_university_id = %s union all select pc.project_id, com.id as assoc_id, com.name as assoc_name, ST_X(com.location) as assoc_long, ST_Y(com.location) as assoc_lat, com.created_at as assoc_created_at, 'C' as type from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id where project.main_university_id = %s) assoc where assoc.project_id = %s;", [universities[i]['id'], universities[i]['id'], universities[i]['projects'][j]['id']])
+                    universities[i]['projects'][j]['aristas'] = dictfetchall(cursor)
+                
+                    cursor.execute("select id, concat(%s, image) as url from bio3_projectimage where project_id = %s;", [settings.MEDIA_URL, universities[i]['projects'][j]['id']])
+                    universities[i]['projects'][j]['images'] = dictfetchall(cursor)
+        # else:
+        #     with connection.cursor() as cursor:
+        #         cursor.execute("select distinct uni.id, uni.name, ST_X(uni.location) as long, ST_Y(uni.location) as lat, uni.created_at, usuario.id as id_user, usuario.name as user_name, usuario.last_name as user_last_name from bio3_university uni inner join bio3_project project on uni.id = project.main_university_id inner join bio3_customuser usuario on uni.created_by_id = usuario.id where project.is_active = true;")
+        #         universities = dictfetchall(cursor)
+
+        #         for i in range(0, len(universities)):
+        #             cursor.execute("select distinct projects.* from (select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s union all select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s) projects;", [universities[i]['id'], universities[i]['id']])
+        #             universities[i]['projects'] = dictfetchall(cursor)
+
+        #             for j in range(0, len(universities[i]['projects'])):
+        #                 cursor.execute("select assoc.*, ROW_NUMBER() OVER(order by project_id asc, type desc, assoc_created_at asc) as rn from (select pu.project_id, uni.id as assoc_id, uni.name as assoc_name, ST_X(uni.location) as assoc_long, ST_Y(uni.location) as assoc_lat, uni.created_at as assoc_created_at, 'U' as type from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id where project.main_university_id = %s union all select pc.project_id, com.id as assoc_id, com.name as assoc_name, ST_X(com.location) as assoc_long, ST_Y(com.location) as assoc_lat, com.created_at as assoc_created_at, 'C' as type from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id where project.main_university_id = %s) assoc where assoc.project_id = %s;", [universities[i]['id'], universities[i]['id'], universities[i]['projects'][j]['id']])
+        #                 universities[i]['projects'][j]['aristas'] = dictfetchall(cursor)
                     
-                        cursor.execute("select id, concat(%s, image) as url from bio3_projectimage where project_id = %s;", [settings.MEDIA_URL, universities[i]['projects'][j]['id']])
-                        universities[i]['projects'][j]['images'] = dictfetchall(cursor)
-        else:
-            with connection.cursor() as cursor:
-                cursor.execute("select distinct uni.id, uni.name, ST_X(uni.location) as long, ST_Y(uni.location) as lat, uni.created_at, usuario.id as id_user, usuario.name as user_name, usuario.last_name as user_last_name from bio3_university uni inner join bio3_project project on uni.id = project.main_university_id inner join bio3_customuser usuario on uni.created_by_id = usuario.id where project.is_active = true;")
-                universities = dictfetchall(cursor)
-
-                for i in range(0, len(universities)):
-                    cursor.execute("select distinct projects.* from (select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s union all select project.id, project.name, project.description, project.created_at, usuario.id as created_by, usuario.name as user_name, usuario.last_name as user_last_name from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and project.main_university_id = %s) projects;", [universities[i]['id'], universities[i]['id']])
-                    universities[i]['projects'] = dictfetchall(cursor)
-
-                    for j in range(0, len(universities[i]['projects'])):
-                        cursor.execute("select assoc.*, ROW_NUMBER() OVER(order by project_id asc, type desc, assoc_created_at asc) as rn from (select pu.project_id, uni.id as assoc_id, uni.name as assoc_name, ST_X(uni.location) as assoc_long, ST_Y(uni.location) as assoc_lat, uni.created_at as assoc_created_at, 'U' as type from bio3_project_universities pu inner join bio3_university uni on pu.university_id = uni.id inner join bio3_project project on pu.project_id = project.id where project.main_university_id = %s union all select pc.project_id, com.id as assoc_id, com.name as assoc_name, ST_X(com.location) as assoc_long, ST_Y(com.location) as assoc_lat, com.created_at as assoc_created_at, 'C' as type from bio3_project_communities pc inner join bio3_community com on pc.community_id = com.id inner join bio3_project project on pc.project_id = project.id where project.main_university_id = %s) assoc where assoc.project_id = %s;", [universities[i]['id'], universities[i]['id'], universities[i]['projects'][j]['id']])
-                        universities[i]['projects'][j]['aristas'] = dictfetchall(cursor)
-                    
-                        cursor.execute("select id, concat(%s, image) as url from bio3_projectimage where project_id = %s;", [settings.MEDIA_URL, universities[i]['projects'][j]['id']])
-                        universities[i]['projects'][j]['images'] = dictfetchall(cursor)
+        #                 cursor.execute("select id, concat(%s, image) as url from bio3_projectimage where project_id = %s;", [settings.MEDIA_URL, universities[i]['projects'][j]['id']])
+        #                 universities[i]['projects'][j]['images'] = dictfetchall(cursor)
 
 
         
