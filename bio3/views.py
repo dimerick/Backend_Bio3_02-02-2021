@@ -423,6 +423,11 @@ class NodesNetworkList(APIView):
             search = search.strip()
         search = '%' + search + '%'
 
+        if start_date.strip() == '':
+            start_date = '1900-01-01'
+        
+        if end_date.strip() == '':
+            end_date = '2999-12-31'
         
         with connection.cursor() as cursor:
             cursor.execute("select uni.id, min(uni.name) as name, min(uni.long) as long, min(uni.lat) as lat, 10+exp(sum(uni.points)*0.001) as points from (select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*1 as points from bio3_project project inner join bio3_university uni on project.main_university_id = uni.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) group by uni.id union all select min(uni.id) as id, min(uni.name) as name, min(ST_X(uni.location)) as long, min(ST_Y(uni.location)) as lat, count(uni.id)*0.5 as points from bio3_project project inner join bio3_project_universities pu on project.id = pu.project_id inner join bio3_university uni on pu.university_id = uni.id inner join bio3_customuser usuario on project.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp) group by university_id) as uni group by uni.id;", [search, search, search, start_date, end_date, search, search, search, start_date, end_date])
@@ -537,6 +542,12 @@ class ProjectNetworkExpandedList(APIView):
         if(search):
             search = search.strip()
         search = '%' + search + '%'
+        if start_date.strip() == '':
+            start_date = '1900-01-01'
+        
+        if end_date.strip() == '':
+            end_date = '2999-12-31'
+        
         with connection.cursor() as cursor:
             cursor.execute("select distinct uni.id, uni.name, ST_X(uni.location) as long, ST_Y(uni.location) as lat, uni.created_at, usuario.id as id_user, usuario.name as user_name, usuario.last_name as user_last_name from bio3_university uni inner join bio3_project project on uni.id = project.main_university_id inner join bio3_customuser usuario on uni.created_by_id = usuario.id where project.is_active = true and (trim(unaccent(project.name)) ilike %s or trim(unaccent(project.description)) ilike %s or concat(trim(unaccent(usuario.name)), unaccent(trim(usuario.last_name))) ilike %s) and cast(to_char(project.created_at, 'YYYY-MM-DD') as timestamp) between cast(%s as timestamp) and cast(%s as timestamp);", [search, search, search, start_date, end_date])
             universities = dictfetchall(cursor)
