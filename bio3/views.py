@@ -141,8 +141,8 @@ class UniversityList(APIView):
     def get(self, request, format=None):
 
         user = request.GET.get('user', None)
-        exclude_id = request.GET.get('exclude_id', None)
-        tipo = request.GET.get('tipo', None)
+        exclude_id = request.GET.get('exclude_id', -1)
+        tipo = request.GET.get('tipo', 'university')
         
         if user:
             with connection.cursor() as cursor:
