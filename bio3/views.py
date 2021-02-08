@@ -144,6 +144,10 @@ class UniversityList(APIView):
         exclude_id = request.GET.get('exclude_id', -1)
         tipo = request.GET.get('tipo', 'university')
         
+        if exclude_id == 'null':
+            exclude_id = -1
+        
+
         if user:
             with connection.cursor() as cursor:
                 cursor.execute("select uni.id, uni.name, ST_Y(uni.location) as lat, ST_X(uni.location) as lon, created_at, uni.created_by_id as created_by, tipo from bio3_university uni where tipo = %s and uni.id <> %s union all select uni.id, 'My Location' as name, ST_Y(uni.location) as lat, ST_X(uni.location) as lon, created_at, uni.created_by_id as created_by, tipo from bio3_university uni inner join bio3_profile prof on uni.id = prof.university_id where prof.user_id = %s;", [tipo, exclude_id, user])
